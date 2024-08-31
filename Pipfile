@@ -1,0 +1,19 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[packages]
+gitlab-cq = {file = ".", editable = true}
+
+[dev-packages]
+# develop
+mypy = "*"
+pyright = "*"
+pytest = "*"
+pytest-cov = "*"
+ruff = "*"
+
+# release
+build = "*"
+twine = "*"

@@ -1,0 +1,141 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools"]
+
+[project]
+authors = [
+  {name = "Yoshiki Matsuda", email = "y_matsuda@fixstars.com"},
+]
+classifiers = [
+  "Environment :: Console",
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS :: MacOS X",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+  "typing_extensions",
+]
+description = "Parse linter output and convert it to GitLab Code Quality report"
+dynamic = ["version"]
+keywords = [
+  "linter",
+  "gitlab",
+  "code quality",
+  "report",
+  "ruff",
+  "pyright",
+  "mypy",
+  "gcc",
+  "clang",
+  "clang-tidy",
+]
+license = {file = "LICENSE.txt"}
+maintainers = [
+  {name = "Yoshiki Matsuda", email = "y_matsuda@fixstars.com"},
+]
+name = "gitlab-cq"
+readme = "README.md"
+requires-python = ">=3.8"
+
+[project.urls]
+Repository = "https://github.com/yosh-matsuda/gitlab-cq"
+
+[project.scripts]
+gitlab-cq = "gitlab_cq.__main__:main"
+
+[tool.setuptools]
+license-files = ["LICENSE.txt"]
+packages = ["gitlab_cq"]
+
+[tool.setuptools.dynamic]
+version = {attr = "gitlab_cq.__version__.__version__"}
+
+[tool.mypy]
+check_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.ruff]
+exclude = ["externals"]
+include = ["*.py", "*.pyi", "**/pyproject.toml", "*.ipynb"]
+line-length = 120
+preview = true
+
+[tool.ruff.lint]
+ignore = [
+  # conflicts with ruff format
+  "COM812",
+  "COM819",
+  "D206",
+  "D300",
+  "E111",
+  "E114",
+  "E117",
+  "ISC001",
+  "ISC002",
+  "Q000",
+  "Q001",
+  "Q002",
+  "Q003",
+  "W191",
+
+  # category
+  "AIR", # Airflow
+  "ASYNC", # flake8-async
+  "C90", # mccabe
+  "COM", # flake8-commas
+  "CPY", # flake8-copyright
+  "DJ", # flake8-django
+  "ERA", # eradicate
+  "EXE", # flake8-executable
+  "FBT", # flake8-boolean-trap
+  "FLY", # flynt
+  "ICN", # flake8-import-conventions
+  "INP", # flake8-no-pep420
+  "INT", # flake8-gettext
+  "PD", # pandas-vet
+  "PGH", # pygrep-hooks
+  "Q", # flake8-quotes
+  "SLOT", # flake8-slots
+  "T10", # flake8-debugger
+  "T20", # flake8-print
+  "TID", # flake8-tidy-imports
+  "EM", # flake8-errmsg
+
+  # rule
+  "ANN101", # missing-type-self (deprecated)
+  "ANN102", # missing-type-cls (deprecated)
+  "D10", # undocumented-XXX
+  "PLR09", # too-many-XXX
+  "S101", # assert
+  "TD001", # invalid-todo-tag
+  "TD002", # missing-todo-author
+  "TD003", # missing-todo-link
+  "TRY003", # raise-vanilla-args
+]
+select = ["ALL"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-branches = 18
+
+[tool.ruff.lint.per-file-ignores]
+"{docs/*,setup}.py" = [
+  # category
+  "D", # pydocstyle
+  "ANN", # flake8-annotations
+  "T20", # flake8-print
+
+  # rule
+  "N806", # non-lowercase-variable-in-function
+  "S107", # hardcoded-password-default
+]
