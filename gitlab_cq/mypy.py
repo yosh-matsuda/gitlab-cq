@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from itertools import dropwhile
 from pathlib import Path
 from typing import Literal, TypedDict
 
@@ -20,7 +21,7 @@ class _MypyOutputJson(TypedDict):
 def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
     gitlab_code_quality: list[GitLabCodeQuality.Issue] = []
     try:
-        for line in linter_output.splitlines():
+        for line in dropwhile(lambda line: not line.startswith("{"), linter_output.splitlines()):
             # skip empty lines
             if not line:
                 continue
@@ -48,6 +49,6 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
             GitLabCodeQuality.add_fingerprint(issue)
             gitlab_code_quality.append(issue)
     except json.JSONDecodeError as e:
-        raise ValueError("Hint: argument `--output=json` is required\noutput:\n" + linter_output) from e
+        raise ValueError(e.msg + "\nHint: argument `--output=json` is required\nOutput:\n" + linter_output) from e
 
     return gitlab_code_quality

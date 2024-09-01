@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Literal, TypedDict
 
@@ -41,9 +42,16 @@ class _PyrightOutputJson(TypedDict):
 
 
 def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
+    # extract JSON body
+    match = re.search(r"(^{.*|(?<=\n){.*)$", linter_output, re.DOTALL)
+    if not match:
+        raise ValueError(
+            "No JSON body found in the output\n" "Hint: argument `--outputjson` is required\nOutput:\n" + linter_output
+        )
+
     gitlab_code_quality: list[GitLabCodeQuality.Issue] = []
     try:
-        pyright_output_json: _PyrightOutputJson = json.loads(linter_output)
+        pyright_output_json: _PyrightOutputJson = json.loads(match.group(0))
         for obj in pyright_output_json["generalDiagnostics"]:
             issue: GitLabCodeQuality.Issue = {
                 "type": "issue",
@@ -69,6 +77,6 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
             GitLabCodeQuality.add_fingerprint(issue)
             gitlab_code_quality.append(issue)
     except json.JSONDecodeError as e:
-        raise ValueError("Hint: argument `--outputjson` is required\noutput:\n" + linter_output) from e
+        raise ValueError(e.msg + "\nHint: argument `--outputjson` is required\nOutput:\n" + linter_output) from e
 
     return gitlab_code_quality

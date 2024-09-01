@@ -1,0 +1,18 @@
+extend = "../pyproject.toml"
+
+[lint.per-file-ignores]
+"*.py" = [
+  # category
+  "D", # pydocstyle
+  "S", # flake8-bandit
+  "ANN", # flake8-annotations
+  "N", # pep8-naming
+
+  # rules
+  "B017", # assert-raises-exception
+  "PT011", # pytest-raises-too-broad
+  "PLR0915", # too-many-statements
+  "PLR2004", # magic-value-comparison
+  "PLW2901", # redefined-loop-name
+  "PLR0912", # too-many-branches
+]

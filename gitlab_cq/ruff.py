@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import TypedDict
 
@@ -37,9 +38,17 @@ class _RuffOutputJson(TypedDict):
 
 
 def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
+    # extract JSON body
+    match = re.search(r"(^\[.*|(?<=\n)\[.*)$", linter_output, re.DOTALL)
+    if not match:
+        raise ValueError(
+            "No JSON body found in the output\n"
+            "Hint: argument `--output-format json` is required and do not set `--output`\nOutput:\n" + linter_output
+        )
+
     gitlab_code_quality: list[GitLabCodeQuality.Issue] = []
     try:
-        ruff_output_json: list[_RuffOutputJson] = json.loads(linter_output)
+        ruff_output_json: list[_RuffOutputJson] = json.loads(match.group())
         for obj in ruff_output_json:
             issue: GitLabCodeQuality.Issue = {
                 "type": "issue",
@@ -60,7 +69,7 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
             gitlab_code_quality.append(issue)
     except json.JSONDecodeError as e:
         raise ValueError(
-            "Hint: argument `--output-format json` is required and do not set `--output`\noutput:\n" + linter_output
+            "Hint: argument `--output-format json` is required and do not set `--output`\nOutput:\n" + linter_output
         ) from e
 
     return gitlab_code_quality
