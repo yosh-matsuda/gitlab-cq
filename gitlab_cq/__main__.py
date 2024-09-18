@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import subprocess  # noqa: S404
 import sys
+import time
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import TYPE_CHECKING, Final, Literal, get_args
 
 from .gcc import parse as parse_gcc
@@ -26,7 +28,7 @@ def _parse_option_args(argv: list[str]) -> tuple[str, bool, bool]:
     while len(argv) > 0:
         if argv[0] == "--output":
             if len(argv) == 1 or argv[1].startswith("--"):
-                print("No output file specified")
+                sys.stderr.write("No output file specified\n")
                 sys.exit(1)
             output_file = argv[1]
             argv.pop(0)
@@ -41,7 +43,7 @@ def _parse_option_args(argv: list[str]) -> tuple[str, bool, bool]:
             break
 
     if not output_file and (echo or merge):
-        print("No output file specified with --echo or --merge")
+        sys.stderr.write("No output file specified with --echo or --merge\n")
         sys.exit(1)
 
     return output_file, merge, echo
@@ -51,7 +53,7 @@ def main() -> None:
     # parse arguments
     argv = sys.argv[1:]
     if len(argv) == 0:
-        print(
+        sys.stdout.write(
             """
  GitLab-CQ: parse linter output and convert it to GitLab Code Quality report
 
@@ -73,7 +75,8 @@ Options:
   --merge               Merge output to existing JSON file
                             (available if --output is specified)
   --echo                Echo linter output
-                            (available if --output is specified)""".format(linters=", ".join(SUPPORTED_LINTERS))
+                            (available if --output is specified)
+""".format(linters=", ".join(SUPPORTED_LINTERS))
         )
         sys.exit(1)
 
@@ -81,29 +84,32 @@ Options:
     linter: _SUPPORTED_LINTERS
     linter_output: str = ""
     output_file, merge, echo = _parse_option_args(argv)
+    cmdline: str = ""
 
-    if not sys.stdin.isatty():
+    if len(argv) == 0:
+        sys.stderr.write("No linter name or command to run\n")
+        sys.exit(1)
+
+    if not sys.stdin.isatty() and len(argv) == 1:
+        linter = argv[0]  # type: ignore
+        if linter not in SUPPORTED_LINTERS:
+            sys.stderr.write(f"Invalid linter name; {linter} is not supported\n")
+            sys.exit(1)
+
         # read from stdin
-
         def _tee(line: str) -> str:
             if echo:
                 sys.stdout.write(line)
             return line
 
         linter_output = "".join(_tee(line) for line in sys.stdin)
-        if len(argv) == 0:
-            print("No command to run")
-            sys.exit(1)
 
-        linter = argv[0]  # type: ignore
-        if linter not in SUPPORTED_LINTERS:
-            print(f"Invalid linter name; {linter} is not supported")
-            sys.exit(1)
-
-    else:
+    if not linter_output:
         # run linter command
         cmd = argv[0]
         arguments = argv[1:]
+        cmdline = " ".join([cmd, *arguments])
+
         for name in SUPPORTED_LINTERS:
             if name in cmd:
                 linter = name
@@ -135,33 +141,46 @@ Options:
                 arguments = req + arguments
 
         # run linter
-        proc = subprocess.Popen(  # noqa: S603
-            [cmd, *arguments], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8", shell=False
-        )
-        while True:
-            assert proc.stdout is not None
-            line = proc.stdout.readline()
-            if line:
-                linter_output += line
+        with NamedTemporaryFile(mode="w", encoding="utf-8", buffering=1, delete=False) as writer:
+            proc = subprocess.Popen(  # noqa: S603
+                [cmd, *arguments], stdout=writer, stderr=subprocess.STDOUT, encoding="utf-8", shell=False
+            )
+            write_path = Path(writer.name)
+            with write_path.open("r", encoding="utf-8", buffering=1) as reader:
+                while proc.poll() is None:
+                    linter_output += (c := reader.read())
+                    if echo:
+                        sys.stdout.write(c)
+                    time.sleep(0.1)
+
+                # close output file and read leftover
+                writer.close()
+                linter_output += (c := reader.read())
                 if echo:
-                    sys.stdout.write(line)
-            elif proc.poll() is not None:
-                break
+                    sys.stdout.write(c)
+
+            # remove temporary file
+            write_path.unlink()
 
     # parse linter output
     issues: list[GitLabCodeQuality.Issue]
-    if linter == "ruff":
-        issues = parse_ruff(linter_output)
-    elif linter == "pyright":
-        issues = parse_pyright(linter_output)
-    elif linter == "mypy":
-        issues = parse_mypy(linter_output)
-    elif linter == "clang-tidy":
-        issues = parse_gcc(linter_output, linter, "minor")
-    elif linter in {"gcc", "clang"}:
-        issues = parse_gcc(linter_output, linter, "major")
-    else:
-        raise ValueError(f"linter {linter} is not supported")
+    try:
+        if linter == "ruff":
+            issues = parse_ruff(linter_output)
+        elif linter == "pyright":
+            issues = parse_pyright(linter_output)
+        elif linter == "mypy":
+            issues = parse_mypy(linter_output)
+        elif linter == "clang-tidy":
+            issues = parse_gcc(linter_output, linter, "minor")
+        elif linter in {"gcc", "clang"}:
+            issues = parse_gcc(linter_output, linter, "major")
+        else:
+            raise ValueError(f"linter {linter} is not supported")  # noqa: TRY301
+    except ValueError as e:
+        if cmdline:
+            raise RuntimeError(f"Failed to parse linter output with command: {cmdline}") from e
+        raise RuntimeError("Failed to parse linter output with std input") from e
 
     # write to output file
     if output_file:
