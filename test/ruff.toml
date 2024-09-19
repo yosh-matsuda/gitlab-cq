@@ -10,6 +10,7 @@ extend = "../pyproject.toml"
 
   # rules
   "B017", # assert-raises-exception
+  "E501", # line-too-long
   "PT011", # pytest-raises-too-broad
   "PLR0915", # too-many-statements
   "PLR2004", # magic-value-comparison

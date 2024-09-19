@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-import pytest
 from gitlab_cq.gcc import parse
 
 if TYPE_CHECKING:
