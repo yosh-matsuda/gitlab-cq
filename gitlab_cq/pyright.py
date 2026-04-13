@@ -41,6 +41,12 @@ class _PyrightOutputJson(TypedDict):
     summary: _Summary
 
 
+_UNDEFINED_RANGE: _Range = _Range(
+    start=_LineCharacter(line=1, character=1),
+    end=_LineCharacter(line=1, character=1),
+)
+
+
 def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
     # extract JSON body
     match = re.search(r"(^{.*|(?<=\n){.*)$", linter_output, re.DOTALL)
@@ -53,6 +59,7 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
     try:
         pyright_output_json: _PyrightOutputJson = json.loads(match.group(0))
         for obj in pyright_output_json["generalDiagnostics"]:
+            issue_range = obj.get("range", _UNDEFINED_RANGE)
             issue: GitLabCodeQuality.Issue = {
                 "type": "issue",
                 "check_name": "Pyright: " + obj["rule"],
@@ -68,8 +75,8 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
                 "location": {
                     "path": str(Path(obj["file"]).relative_to(Path.cwd())),
                     "positions": {
-                        "begin": {"line": obj["range"]["start"]["line"], "column": obj["range"]["start"]["character"]},
-                        "end": {"line": obj["range"]["end"]["line"], "column": obj["range"]["end"]["character"]},
+                        "begin": {"line": issue_range["start"]["line"], "column": issue_range["start"]["character"]},
+                        "end": {"line": issue_range["end"]["line"], "column": issue_range["end"]["character"]},
                     },
                 },
                 "severity": "minor",
