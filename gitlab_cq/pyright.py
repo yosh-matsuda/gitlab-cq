@@ -59,6 +59,8 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
     try:
         pyright_output_json: _PyrightOutputJson = json.loads(match.group(0))
         for obj in pyright_output_json["generalDiagnostics"]:
+            # "range" key is optional - this behavior is not documented in
+            # https://github.com/microsoft/pyright/blob/main/docs/command-line.md#json-output
             issue_range = obj.get("range", _UNDEFINED_RANGE)
             issue: GitLabCodeQuality.Issue = {
                 "type": "issue",
