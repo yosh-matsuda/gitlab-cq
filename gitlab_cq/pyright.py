@@ -42,8 +42,8 @@ class _PyrightOutputJson(TypedDict):
 
 
 _UNDEFINED_RANGE: _Range = _Range(
-    start=_LineCharacter(line=1, character=1),
-    end=_LineCharacter(line=1, character=1),
+    start=_LineCharacter(line=0, character=0),
+    end=_LineCharacter(line=0, character=0),
 )
 
 
@@ -75,8 +75,15 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
                 "location": {
                     "path": str(Path(obj["file"]).relative_to(Path.cwd())),
                     "positions": {
-                        "begin": {"line": issue_range["start"]["line"], "column": issue_range["start"]["character"]},
-                        "end": {"line": issue_range["end"]["line"], "column": issue_range["end"]["character"]},
+                        # Pyright outputs zero-based line/character numbers; convert to one-based.
+                        "begin": {
+                            "line": issue_range["start"]["line"] + 1,
+                            "column": issue_range["start"]["character"] + 1,
+                        },
+                        "end": {
+                            "line": issue_range["end"]["line"] + 1,
+                            "column": issue_range["end"]["character"] + 1,
+                        },
                     },
                 },
                 "severity": "minor",
