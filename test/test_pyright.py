@@ -51,10 +51,10 @@ pyright_issues: Final[list[GitLabCodeQuality.Issue]] = [
         "categories": ["Style"],
         "location": {
             "path": str(Path(__file__).relative_to(Path.cwd())),
-            "positions": {"begin": {"line": 6763, "column": 8}, "end": {"line": 6763, "column": 18}},
+            "positions": {"begin": {"line": 6764, "column": 9}, "end": {"line": 6764, "column": 19}},
         },
         "severity": "minor",
-        "fingerprint": "7bcb5e22c26fff8251f5e3eacfeaf269",
+        "fingerprint": "26d2e20d22894b9e115aac3df3869c3a",
     }
 ]
 

@@ -41,6 +41,12 @@ class _PyrightOutputJson(TypedDict):
     summary: _Summary
 
 
+_UNDEFINED_RANGE: _Range = _Range(
+    start=_LineCharacter(line=0, character=0),
+    end=_LineCharacter(line=0, character=0),
+)
+
+
 def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
     # extract JSON body
     match = re.search(r"(^{.*|(?<=\n){.*)$", linter_output, re.DOTALL)
@@ -53,6 +59,9 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
     try:
         pyright_output_json: _PyrightOutputJson = json.loads(match.group(0))
         for obj in pyright_output_json["generalDiagnostics"]:
+            # "range" key is optional - this behavior is not documented in
+            # https://github.com/microsoft/pyright/blob/main/docs/command-line.md#json-output
+            issue_range = obj.get("range", _UNDEFINED_RANGE)
             issue: GitLabCodeQuality.Issue = {
                 "type": "issue",
                 "check_name": "Pyright: " + obj["rule"],
@@ -68,8 +77,15 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
                 "location": {
                     "path": str(Path(obj["file"]).relative_to(Path.cwd())),
                     "positions": {
-                        "begin": {"line": obj["range"]["start"]["line"], "column": obj["range"]["start"]["character"]},
-                        "end": {"line": obj["range"]["end"]["line"], "column": obj["range"]["end"]["character"]},
+                        # Pyright outputs zero-based line/character numbers; convert to one-based.
+                        "begin": {
+                            "line": issue_range["start"]["line"] + 1,
+                            "column": issue_range["start"]["character"] + 1,
+                        },
+                        "end": {
+                            "line": issue_range["end"]["line"] + 1,
+                            "column": issue_range["end"]["character"] + 1,
+                        },
                     },
                 },
                 "severity": "minor",
