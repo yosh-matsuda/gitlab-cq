@@ -95,3 +95,29 @@ def test_gcc_empty() -> None:
 
 def test_gcc() -> None:
     assert parse(gcc_output_str, "gcc", "major") == gcc_issues
+
+
+# clang-tidy gives no `[check]` for a diagnostic that no check controls
+gcc_output_str_without_diagnostic: Final[str] = """{file_path}:12:5: error: use of undeclared identifier 'xxx'
+   12 |     xxx();
+      |     ^
+""".replace("{file_path}", str(Path(__file__).resolve()))
+
+gcc_issues_without_diagnostic: Final[list[GitLabCodeQuality.Issue]] = [
+    {
+        "type": "issue",
+        "check_name": "clang-tidy",
+        "description": "use of undeclared identifier 'xxx'",
+        "categories": ["Bug Risk"],
+        "location": {
+            "path": str(Path(__file__).relative_to(Path.cwd())),
+            "positions": {"begin": {"line": 12, "column": 5}, "end": {"line": 12, "column": 5}},
+        },
+        "severity": "major",
+        "fingerprint": "6a082f6cd4a6078020d9a1d080d0ff71",
+    },
+]
+
+
+def test_gcc_without_diagnostic() -> None:
+    assert parse(gcc_output_str_without_diagnostic, "clang-tidy", "major") == gcc_issues_without_diagnostic

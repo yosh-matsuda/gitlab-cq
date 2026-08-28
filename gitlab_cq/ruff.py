@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from typing import TypedDict
 
+from typing_extensions import NotRequired
+
 from . import GitLabCodeQuality
 
 
@@ -26,15 +28,16 @@ class _Fix(TypedDict):
 
 
 class _RuffOutputJson(TypedDict):
-    cell: None | int
-    code: str
+    cell: int | None
+    code: str | None
     end_location: _LocationOrEndLocation
     filename: str
-    fix: None | _Fix
+    fix: _Fix | None
     location: _LocationOrEndLocation
     message: str
-    noqa_row: int
-    url: str
+    name: NotRequired[str]
+    noqa_row: int | None
+    url: str | None
 
 
 def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
@@ -46,30 +49,37 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
             "Hint: argument `--output-format json` is required and do not set `--output`\nOutput:\n" + linter_output
         )
 
-    gitlab_code_quality: list[GitLabCodeQuality.Issue] = []
     try:
         ruff_output_json: list[_RuffOutputJson] = json.loads(match.group())
-        for obj in ruff_output_json:
-            issue: GitLabCodeQuality.Issue = {
-                "type": "issue",
-                "check_name": "Ruff: " + obj["code"],
-                "description": obj["message"],
-                "content": {"body": "[" + obj["code"] + "](" + obj["url"] + ")"},
-                "categories": ["Style"],
-                "location": {
-                    "path": str(Path(obj["filename"]).relative_to(Path.cwd())),
-                    "positions": {
-                        "begin": {"line": obj["location"]["row"], "column": obj["location"]["column"]},
-                        "end": {"line": obj["end_location"]["row"], "column": obj["end_location"]["column"]},
-                    },
-                },
-                "severity": "minor",
-            }
-            GitLabCodeQuality.add_fingerprint(issue)
-            gitlab_code_quality.append(issue)
     except json.JSONDecodeError as e:
         raise ValueError(
             "Hint: argument `--output-format json` is required and do not set `--output`\nOutput:\n" + linter_output
         ) from e
+
+    gitlab_code_quality: list[GitLabCodeQuality.Issue] = []
+    for obj in ruff_output_json:
+        # `code` is null for a syntax error and for a preview rule that has no code assigned
+        # yet, and `url` is null whenever the rule has no documentation page. `name` holds the
+        # rule in both cases, so it is the fallback for the check name.
+        rule = obj["code"] or obj.get("name") or ""
+        url = obj["url"]
+        issue: GitLabCodeQuality.Issue = {
+            "type": "issue",
+            "check_name": "Ruff: " + rule if rule else "Ruff",
+            "description": obj["message"],
+            "categories": ["Style"],
+            "location": {
+                "path": str(Path(obj["filename"]).relative_to(Path.cwd())),
+                "positions": {
+                    "begin": {"line": obj["location"]["row"], "column": obj["location"]["column"]},
+                    "end": {"line": obj["end_location"]["row"], "column": obj["end_location"]["column"]},
+                },
+            },
+            "severity": "minor",
+        }
+        if rule and url:
+            issue["content"] = {"body": "[" + rule + "](" + url + ")"}
+        GitLabCodeQuality.add_fingerprint(issue)
+        gitlab_code_quality.append(issue)
 
     return gitlab_code_quality

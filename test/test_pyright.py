@@ -92,3 +92,54 @@ def test_pyright_no_error() -> None:
 def test_pyright() -> None:
     assert parse(pyright_json_str) == pyright_issues
     assert parse(pyright_json_str_with_warn) == pyright_issues
+
+
+# pyright gives no "rule" for a diagnostic that no rule controls, such as a syntax error
+pyright_json_str_without_rule: Final[str] = """{
+    "version": "1.1.378",
+    "time": "1725119710426",
+    "generalDiagnostics": [
+        {
+            "file": "{file_path}",
+            "severity": "error",
+            "message": "\\"(\\" was not closed",
+            "range": {
+                "start": {
+                    "line": 0,
+                    "character": 5
+                },
+                "end": {
+                    "line": 0,
+                    "character": 6
+                }
+            }
+        }
+    ],
+    "summary": {
+        "filesAnalyzed": 1,
+        "errorCount": 1,
+        "warningCount": 0,
+        "informationCount": 0,
+        "timeInSec": 0.1
+    }
+}
+""".replace("{file_path}", str(Path(__file__).resolve()))
+
+pyright_issues_without_rule: Final[list[GitLabCodeQuality.Issue]] = [
+    {
+        "type": "issue",
+        "check_name": "Pyright",
+        "description": '"(" was not closed',
+        "categories": ["Style"],
+        "location": {
+            "path": str(Path(__file__).relative_to(Path.cwd())),
+            "positions": {"begin": {"line": 1, "column": 6}, "end": {"line": 1, "column": 7}},
+        },
+        "severity": "minor",
+        "fingerprint": "341f866e31014f629808c6fc6430cde3",
+    },
+]
+
+
+def test_pyright_without_rule() -> None:
+    assert parse(pyright_json_str_without_rule) == pyright_issues_without_rule

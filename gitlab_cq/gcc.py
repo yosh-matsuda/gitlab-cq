@@ -21,9 +21,12 @@ def parse(
         if regex_result is None or regex_result.group("severity") == "note":
             continue
         try:
+            # a diagnostic that carries no `[name]` gives None here, which happens for a message
+            # that no flag and no check controls
+            diagnostic = regex_result.group("diagnostic")
             issue: GitLabCodeQuality.Issue = {
                 "type": "issue",
-                "check_name": f"{name}: " + regex_result.group("diagnostic"),
+                "check_name": f"{name}: {diagnostic}" if diagnostic else name,
                 "description": regex_result.group("message"),
                 "categories": ["Bug Risk"],
                 "location": {

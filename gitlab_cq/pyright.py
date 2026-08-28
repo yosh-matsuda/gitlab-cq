@@ -5,6 +5,8 @@ import re
 from pathlib import Path
 from typing import Literal, TypedDict
 
+from typing_extensions import NotRequired
+
 from . import GitLabCodeQuality
 
 
@@ -23,7 +25,7 @@ class _GeneralDiagnostic(TypedDict):
     severity: Literal["error", "warning", "information"]
     message: str
     range: _Range
-    rule: str
+    rule: NotRequired[str]
 
 
 class _Summary(TypedDict):
@@ -55,44 +57,48 @@ def parse(linter_output: str) -> list[GitLabCodeQuality.Issue]:
             "No JSON body found in the output\n" "Hint: argument `--outputjson` is required\nOutput:\n" + linter_output
         )
 
-    gitlab_code_quality: list[GitLabCodeQuality.Issue] = []
     try:
         pyright_output_json: _PyrightOutputJson = json.loads(match.group(0))
-        for obj in pyright_output_json["generalDiagnostics"]:
-            # "range" key is optional - this behavior is not documented in
-            # https://github.com/microsoft/pyright/blob/main/docs/command-line.md#json-output
-            issue_range = obj.get("range", _UNDEFINED_RANGE)
-            issue: GitLabCodeQuality.Issue = {
-                "type": "issue",
-                "check_name": "Pyright: " + obj["rule"],
-                "description": obj["message"],
-                "content": {
-                    "body": "["
-                    + obj["rule"]
-                    + "](https://github.com/microsoft/pyright/blob/main/docs/configuration.md#"
-                    + obj["rule"]
-                    + ")"
-                },
-                "categories": ["Style"],
-                "location": {
-                    "path": str(Path(obj["file"]).relative_to(Path.cwd())),
-                    "positions": {
-                        # Pyright outputs zero-based line/character numbers; convert to one-based.
-                        "begin": {
-                            "line": issue_range["start"]["line"] + 1,
-                            "column": issue_range["start"]["character"] + 1,
-                        },
-                        "end": {
-                            "line": issue_range["end"]["line"] + 1,
-                            "column": issue_range["end"]["character"] + 1,
-                        },
-                    },
-                },
-                "severity": "minor",
-            }
-            GitLabCodeQuality.add_fingerprint(issue)
-            gitlab_code_quality.append(issue)
     except json.JSONDecodeError as e:
         raise ValueError(e.msg + "\nHint: argument `--outputjson` is required\nOutput:\n" + linter_output) from e
+
+    gitlab_code_quality: list[GitLabCodeQuality.Issue] = []
+    for obj in pyright_output_json["generalDiagnostics"]:
+        # "range" key is optional - this behavior is not documented in
+        # https://github.com/microsoft/pyright/blob/main/docs/command-line.md#json-output
+        issue_range = obj.get("range", _UNDEFINED_RANGE)
+        # "rule" key is absent for a diagnostic that no rule controls, such as a syntax error
+        rule = obj.get("rule")
+        issue: GitLabCodeQuality.Issue = {
+            "type": "issue",
+            "check_name": "Pyright: " + rule if rule else "Pyright",
+            "description": obj["message"],
+            "categories": ["Style"],
+            "location": {
+                "path": str(Path(obj["file"]).relative_to(Path.cwd())),
+                "positions": {
+                    # Pyright outputs zero-based line/character numbers; convert to one-based.
+                    "begin": {
+                        "line": issue_range["start"]["line"] + 1,
+                        "column": issue_range["start"]["character"] + 1,
+                    },
+                    "end": {
+                        "line": issue_range["end"]["line"] + 1,
+                        "column": issue_range["end"]["character"] + 1,
+                    },
+                },
+            },
+            "severity": "minor",
+        }
+        if rule:
+            issue["content"] = {
+                "body": "["
+                + rule
+                + "](https://github.com/microsoft/pyright/blob/main/docs/configuration.md#"
+                + rule
+                + ")"
+            }
+        GitLabCodeQuality.add_fingerprint(issue)
+        gitlab_code_quality.append(issue)
 
     return gitlab_code_quality
